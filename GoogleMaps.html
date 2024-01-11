@@ -376,6 +376,49 @@
 
         // Initial render of results -----------------------------------------------
         locator.renderResultsList();
+
+        locator.getUserLocation = function() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        const userLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        // Erstellen Sie einen Marker an der Position des Benutzers
+        new google.maps.Marker({
+          position: userLocation,
+          map: locator.map,
+          title: 'Your location',
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: '#0000ff',
+            fillOpacity: 0.8,
+            strokeWeight: 0
+          }
+        });
+        // Zentrieren Sie die Karte auf die Position des Benutzers
+        locator.map.setCenter(userLocation);
+        // Setzen Sie den Zoom-Level der Karte
+        locator.map.setZoom(14); // Sie können den Wert 14 durch den gewünschten Zoom-Level ersetzen
+
+      }, function() {
+        handleLocationError(true, locator.map.getCenter());
+      });
+    } else {
+      // Browser unterstützt keine Geolocation
+      handleLocationError(false, locator.map.getCenter());
+    }
+  }
+
+  function handleLocationError(browserHasGeolocation, pos) {
+    const infoWindow = new google.maps.InfoWindow({map: locator.map});
+    infoWindow.setPosition(pos);
+    infoWindow.setContent(
+      browserHasGeolocation ?
+      'Error: The Geolocation service failed.' :
+      'Error: Your browser doesn\'t support geolocation.');
+  }
       }
 
       /** When the search input capability is enabled, initialize it. */
@@ -387,41 +430,42 @@
         const searchButtonEl = document.getElementById('location-search-button');
 
         const updateSearchLocation = function(address, location) {
-          if (locator.searchLocationMarker) {
-            locator.searchLocationMarker.setMap(null);
-          }
-          if (!location) {
-            locator.searchLocation = null;
-            return;
-          }
-          locator.searchLocation = {'address': address, 'location': location};
-          locator.searchLocationMarker = new google.maps.Marker({
-            position: location,
-            map: locator.map,
-            title: 'My location',
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 12,
-              fillColor: '#3367D6',
-              fillOpacity: 0.5,
-              strokeOpacity: 0,
-            }
-          });
+  if (locator.searchLocationMarker) {
+    locator.searchLocationMarker.setMap(null);
+  }
+  if (!location) {
+    locator.searchLocation = null;
+    return;
+  }
+  locator.searchLocation = {'address': address, 'location': location};
+  locator.searchLocationMarker = new google.maps.Marker({
+    position: location,
+    map: locator.map,
+    title: 'My location',
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 12,
+      fillColor: '#3367D6',
+      fillOpacity: 0.5,
+      strokeOpacity: 0,
+    }
+  });
 
-          // Update the locator's idea of the user's country, used for units. Use
-          // `formatted_address` instead of the more structured `address_components`
-          // to avoid an additional billed call.
-          const addressParts = address.split(' ');
-          locator.userCountry = addressParts[addressParts.length - 1];
+  // Update the locator's idea of the user's country, used for units. Use
+  // `formatted_address` instead of the more structured `address_components`
+  // to avoid an additional billed call.
+  const addressParts = address.split(' ');
+  locator.userCountry = addressParts[addressParts.length - 1];
 
-          // Update map bounds to include the new location marker.
-          locator.updateBounds();
+  // Update map bounds to include the new location marker.
+  locator.map.setCenter(location); // Set the center of the map to the new location
+  locator.map.setZoom(14); // Set the zoom level to 14 (or any other value you prefer)
 
-          // Update the result list so we can sort it by proximity.
-          locator.renderResultsList();
+  // Update the result list so we can sort it by proximity.
+  locator.renderResultsList();
 
-          locator.updateTravelTimes();
-        };
+  locator.updateTravelTimes();
+};
 
         const geocodeSearch = function(query) {
           if (!query) {
@@ -527,18 +571,21 @@
     <script>
             const CONFIGURATION = {
         "locations": [], // Die Standortdaten werden dynamisch geladen
-        // ... Der restliche Konfigurationscode bleibt unverändert ...
+
       };
 
       function initMap() {
-        fetch('getLocations.php') // Hier ist der relative Pfad zur PHP-Datei
-          .then(response => response.json())
-          .then(locations => {
-            CONFIGURATION.locations = locations;
-            new LocatorPlus(CONFIGURATION);
-          })
-          .catch(error => console.error('Error fetching locations:', error));
-      }
+  fetch('getLocations.php') // Hier ist der relative Pfad zur PHP-Datei
+    .then(response => response.json())
+    .then(locations => {
+      CONFIGURATION.locations = locations;
+      const locator = new LocatorPlus(CONFIGURATION);
+      // Rufen Sie die Funktion getUserLocation auf, wenn die Karte initialisiert wird
+      locator.getUserLocation();
+      
+    })
+    .catch(error => console.error('Error fetching locations:', error));
+}
       
     </script>
     <script id="locator-result-items-tmpl" type="text/x-handlebars-template">
